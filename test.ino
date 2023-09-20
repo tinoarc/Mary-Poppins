@@ -1,9 +1,12 @@
 #include <SPI.h>
+#include <Wire.h>
 #include <SD.h>
 #include <DFRobot_BMP3XX.h>
 #include <PID_v1.h>  // Include the PID library
+#include <Servo.h>
 
 File myFile;
+Servo myservo;
 String nameGlobal;
 
 const int xPin = A2;
@@ -25,11 +28,15 @@ double startAlt = 310.0; //in feet, of height of motor burnout
 // Define PID variables
 double input, output;
 
+int pos = 0;
+bool extended = false;
+int delay = 1000;
 // Create an instance of PID controller
 PID myPID(&input, &output, &setpoint, Kp, Ki, Kd, DIRECT);
 
 void setup() {
     Serial.begin(460800);
+    myservo.attach(9);
 
     //SD Card reader setup
     pinMode(8, OUTPUT);
@@ -80,7 +87,7 @@ void setup() {
 }
 
 void loop() {
-    
+    extended = false;
     // Rest of your loop code...
     //setup for accelerometer data
     int xRaw = analogRead(xPin), yRaw = analogRead(yPin), zRaw = analogRead(zPin);
@@ -92,6 +99,34 @@ void loop() {
     // Calculate the PID output
     myPID.Compute();
 
+    //6s for extension, 30 degrees per second, 1/5 second for 6 degree extension/retraction
+    double apogee = 900;
+    double target = 812;
+    if (target < apogee){
+        extended = true;
+        int mmExtend = 5; //how many millimeters to extend actuator
+        int maxExtend = min(pos + 6*mmExtend, 180);
+        for (int i = pos; i <= maxExtend; pos += 6)
+        {
+            pos = i;
+            myservo.write(pos);
+            delay(200);
+        }
+        pos = maxExtend;
+        myservo.write(pos);
+    } else {
+        extended = true;
+        int mmExtend = -5; //how many millimeters to extend actuator
+        int maxExtend = max(pos + 6*mmExtend, 0);
+        for (int i = pos; i >= maxExtend; pos -= 6)
+        {
+            pos = i;
+            myservo.write(pos);
+            delay(200);
+        }
+        pos = maxExtend;
+        myservo.write(pos);
+    }
     // Adjust the airbrakes position based on the PID output
     // Replace this with your code to control the airbrakes
     // For example, you can map the output to the position of the airbrakes servo/motor
@@ -124,5 +159,5 @@ void loop() {
     } else {
         Serial.println("error opening test.txt");
     }
-    delay(200);
+    delay(200); //may need this/????
 }
