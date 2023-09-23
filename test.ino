@@ -14,7 +14,8 @@ const int yPin = A1;
 const int zPin = A0;
 const int samples = 10;
 const double g = 9.81;
-const double rho = 1.2; //1.2 kg/m^3 is placeholder rn
+const double rho = 1.16; //1.2 kg/m^3 is placeholder rn
+const double baseSA = 0.004046; //base surface area without extension
 
 DFRobot_BMP390L_I2C sensor(&Wire, sensor.eSDOVDD);
 #define CALIBRATE_ABSOLUTE_DIFFERENCE
@@ -104,7 +105,7 @@ void loop() {
 
     double apogee = -1; //placeholder 
     double target = 250; //in meters
-    double mass = 10; //placeholder value
+    double mass = 0.512; //placeholder value
     double k = calculateK()
     double v = calculateVel(input); //need to calculate velocity
     apogee = predictApogee(mass, k, v) + input;
@@ -193,10 +194,11 @@ double calculateCd(){
 
 //need to recalculate Surface area bc Actuator extension
 double calculateSA(){
-    return 0.0;
+    double airbrakeArea = sin(0.00421*pos)*area*3;
+    return 0.004046 + airbrakeArea; //width =54.5, 60mm full extend angle is 43 degrees and 
 }
 
 double predictApogee(double M, double k, double v){
-    double yc = (M / (2*k))*log((M*g + k*v*v) / (M*g))
+    double yc = (M / (2*k))*log((M*g + k*v*v) / (M*g));
     return yc;
 }
