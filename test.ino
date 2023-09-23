@@ -183,18 +183,24 @@ double calculateVel(double altitude, double prevAltitude){
 }
 
 double calculateK(double currVel, double currAcc){
-    double A = calculateSA();
-    double Cd = calculateCd(currVel, currAcc, A);
-    double k = 0.5*rho*Cd*A; //rho is air density, Cd is drag coefficient, A is surface area
+    //double A = calculateSA();
+    double Cd = calculateCd(currVel, currAcc); //, A
+    //double k = 0.5*rho*Cd*A; //rho is air density, Cd is drag coefficient, A is surface area
+    double k = 0.5*Cd;
     return k;
 }
 
 //need to recalculate Drag coefficient
-double calculateCd(double currVel, double currAcc, double SA){
+double calculateCd(double currVel, double currAcc){ //, double SA
+    // double Cd = 0;
+    // double den = -2 * (currAcc * mass + mass*g);
+    // double num = rho * SA * currVel * currVel;
+        
+    // Cd = den/num;
+    // return Cd;
     double Cd = 0;
     double den = -2 * (currAcc * mass + mass*g);
-    double num = rho * SA * currVel * currVel;
-        
+    double num = currVel * currVel;
     Cd = den/num;
     return Cd;
 }
