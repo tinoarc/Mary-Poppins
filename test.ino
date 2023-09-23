@@ -2,7 +2,7 @@
 #include <Wire.h>
 #include <SD.h>
 #include <DFRobot_BMP3XX.h>
-#include <PID_v1.h>  // Include the PID library 
+#include <PID_v1.h>  // Include the PID library
 #include <Servo.h>
 
 File myFile;
@@ -13,6 +13,8 @@ const int xPin = A2;
 const int yPin = A1;
 const int zPin = A0;
 const int samples = 10;
+const double g = 9.81;
+const double rho = 1.2; //1.2 kg/m^3 is placeholder rn
 
 DFRobot_BMP390L_I2C sensor(&Wire, sensor.eSDOVDD);
 #define CALIBRATE_ABSOLUTE_DIFFERENCE
@@ -27,22 +29,23 @@ double startAlt = 310.0; //in feet, of height of motor burnout
 
 // Define PID variables
 double input, output;
-
+double prevAlt = -1;
+const int mmExtend = 1; //how many millimeters to extend actuator per loop
 int pos = 0;
-bool extended = false;
+int extended = 0; //is 0 if no extension, 1 if extended outwards, -1 if extended inwards
 int delay = 1000;
 // Create an instance of PID controller
 PID myPID(&input, &output, &setpoint, Kp, Ki, Kd, DIRECT);
 
 void setup() {
-    Serial.begin(460800);
+    Serial.begin(460800); //might need to change this
     myservo.attach(9);
 
     //SD Card reader setup
     pinMode(8, OUTPUT);
     if (!SD.begin(8)) {
         Serial.println("Initialization failed!");
-        while (1) delay(10);
+        while (1) delay(10); //infinite loop possibility
     }
   
     // Rest of your setup code...
@@ -66,7 +69,7 @@ void setup() {
         }else if(ERR_IC_VERSION == rslt){
         Serial.println("Chip versions do not match!!!");
         }
-        delay(3000);
+        delay(3000); //delay might need to be changed
     }
     Serial.println("Begin ok!");
 
@@ -83,28 +86,36 @@ void setup() {
     #endif
 
     // Initialize PID controller
-    myPID.SetMode(AUTOMATIC); 
+    //myPID.SetMode(AUTOMATIC); 
 }
 
 void loop() {
-    extended = false;
-    // Rest of your loop code...
-    //setup for accelerometer data
+    extended = 0;
+
+    //setup for accelerometer data, need to change map values according to calibration
     int xRaw = analogRead(xPin), yRaw = analogRead(yPin), zRaw = analogRead(zPin);
-    float xCalc = map(xRaw, 140, 560, -16*98, 16*98)/10, yCalc = map(yRaw, 140, 560, -16*98, 16*98)/10, zCalc = map(zRaw, 140, 560, -16*98, 16*98)/10;
+    double xCalc = map(xRaw, 140, 560, -16*98, 16*98)/10, yCalc = map(yRaw, 140, 560, -16*98, 16*98)/10, zCalc = map(zRaw, 140, 560, -16*98, 16*98)/10;
 
     // Read altitude from the sensor
-    input = sensor.readAltitudeM();
+    input = sensor.readAltitudeM(); //need to check if its reading out meters or feet/inches
 
     // Calculate the PID output
-    myPID.Compute();
+    //myPID.Compute();
+
+    double apogee = -1; //placeholder 
+    double target = 250; //in meters
+    double mass = 10; //placeholder value
+    double k = calculateK()
+    double v = calculateVel(input); //need to calculate velocity
+    apogee = predictApogee(mass, k, v) + input;
+    // Adjust the airbrakes position based on the PID output
+    // Replace this with your code to control the airbrakes
+    // For example, you can map the output to the position of the airbrakes servo/motor
 
     //6s for extension, 30 degrees per second, 1/5 second for 6 degree extension/retraction
-    double apogee = 900;
-    double target = 812;
+    
     if (target < apogee){
-        extended = true;
-        int mmExtend = 5; //how many millimeters to extend actuator
+        extended = 1; //how many millimeters to extend actuator
         int maxExtend = min(pos + 6*mmExtend, 180);
         for (int i = pos; i <= maxExtend; pos += 6)
         {
@@ -114,10 +125,9 @@ void loop() {
         }
         pos = maxExtend;
         myservo.write(pos);
-    } else {
-        extended = true;
-        int mmExtend = -5; //how many millimeters to extend actuator
-        int maxExtend = max(pos + 6*mmExtend, 0);
+    } else if (target > apogee){
+        extended = -1;
+        int maxExtend = max(pos - 6*mmExtend, 0);
         for (int i = pos; i >= maxExtend; pos -= 6)
         {
             pos = i;
@@ -127,12 +137,9 @@ void loop() {
         pos = maxExtend;
         myservo.write(pos);
     }
-    // Adjust the airbrakes position based on the PID output
-    // Replace this with your code to control the airbrakes
-    // For example, you can map the output to the position of the airbrakes servo/motor
 
-    Serial.print("Control Output: ");
-    Serial.println(output);
+    // Serial.print("Control Output: ");
+    // Serial.println(output);
 
     // Rest of your loop code...
     //writing data to sd card
@@ -152,12 +159,44 @@ void loop() {
         myFile.println();
 
         myFile.println("Barometer Data"); 
-        myFile.println(sensor.readAltitudeM());
+        myFile.println(input); //might need to be changed
+
+        if (extended != 0){
+            myFile.println("Extended Actuator: " + (mmExtend*extended) + " mm");
+        }
         myFile.close();
 
         Serial.println("done.");
     } else {
         Serial.println("error opening test.txt");
     }
-    delay(200); //may need this/????
+    prevAlt = input; //seting previous altitude to current altitude
+    if (extended == 0)
+        delay(200 * mmExtend); //artificial delay to keep delta T constant
+}
+
+double calculateVel(double altitude, double prevAltitude){
+    return (altitude - prevAltitude)/(200/1000 * mmExtend);
+}
+
+double calculateK(){
+    double Cd = calculateCd();
+    double A = calculateSA();
+    double k = 0.5*rho*Cd*A; //rho is air density, Cd is drag coefficient, A is surface area
+    return k;
+}
+
+//need to recalculate Drag coefficient
+double calculateCd(){
+    return 0.0;
+}
+
+//need to recalculate Surface area bc Actuator extension
+double calculateSA(){
+    return 0.0;
+}
+
+double predictApogee(double M, double k, double v){
+    double yc = (M / (2*k))*log((M*g + k*v*v) / (M*g))
+    return yc;
 }
