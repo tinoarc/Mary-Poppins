@@ -195,7 +195,7 @@ double calculateCd(){
 //need to recalculate Surface area bc Actuator extension
 double calculateSA(){
     double airbrakeArea = sin(0.00421*pos)*area*3;
-    return 0.004046 + airbrakeArea; //width =54.5, 60mm full extend angle is 43 degrees and 
+    return baseSA + airbrakeArea; //width =54.5, 60mm full extend angle is 43 degrees and 
 }
 
 double predictApogee(double M, double k, double v){
