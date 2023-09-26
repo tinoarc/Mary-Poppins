@@ -106,7 +106,7 @@ void loop() {
     double apogee = -1; //placeholder 
     double target = 250; //in meters
     double v = calculateVel(altitude, prevAlt); //need to calculate velocity
-    double k = calculateK(v, xCalc/10) //axis may be up for change depend on mount orientation
+    double k = calculateK(v, xCalc/10); //axis may be up for change depend on mount orientation
     apogee = predictApogee(mass, k, v) + altitude;
     // Adjust the airbrakes position based on the PID output
     // Replace this with your code to control the airbrakes
@@ -143,6 +143,8 @@ void loop() {
 
     // Rest of your loop code...
     //writing data to sd card
+
+    //reformat logging stuffs
     myFile = SD.open(nameGlobal, FILE_WRITE);
     if (myFile){
         Serial.print(nameGlobal);
@@ -159,13 +161,17 @@ void loop() {
         myFile.println();
 
         myFile.println("Barometer Data"); 
-        myFile.println(altitude + "m"); //might need to be changed
+        myFile.print(altitude);
+        myFile.println("m"); //might need to be changed
 
         myFile.println("Predicted apogee");
-        myFile.println(apogee + "m");
+        myFile.print(apogee);
+        myFile.println("m");
 
         if (extended != 0){
-            myFile.println("Extended Actuator: " + (mmExtend*extended) + " mm");
+            myFile.print("Extended Actuator: ");
+            myFile.print((mmExtend*extended));
+            myFile.println("mm");
         }
         myFile.close();
 
@@ -206,7 +212,7 @@ double calculateCd(double currVel, double currAcc){ //, double SA
 }
 
 double calculateSA(){
-    double airbrakeArea = sin(0.00421*pos)*area*3;
+    double airbrakeArea = sin(0.00421*pos)*3;
     return baseSA + airbrakeArea; //width =54.5, 60mm full extend angle is 43 degrees and 
 }
 
