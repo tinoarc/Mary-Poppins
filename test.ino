@@ -150,29 +150,32 @@ void loop() {
         Serial.print(nameGlobal);
         Serial.print("\t");
         // write necessary data to SD Card here
-        myFile.println("Accelerometer Data"); 
+        myFile.print("Accelerometer Data: "); 
         myFile.print(xCalc/10);
-        myFile.print("\t");
+        myFile.print(",\t");
 
         myFile.print(yCalc/10);
-        myFile.print("\t");
+        myFile.print(",\t");
 
         myFile.print(zCalc/10);
-        myFile.println();
+        myFile.print("\t");
 
-        myFile.println("Barometer Data"); 
+        myFile.print("Barometer Data: "); 
         myFile.print(altitude);
-        myFile.println("m"); //might need to be changed
+        myFile.print("m"); //might need to be changed
+        myFile.print("\t");
 
-        myFile.println("Predicted apogee");
+        myFile.print("Predicted apogee: ");
         myFile.print(apogee);
-        myFile.println("m");
-
+        myFile.print("m");
+        myFile.print("\t");
+        Serial.println(apogee);
         if (extended != 0){
             myFile.print("Extended Actuator: ");
             myFile.print((mmExtend*extended));
-            myFile.println("mm");
+            myFile.print("mm");
         }
+        myFile.println("");
         myFile.close();
 
         Serial.println("done.");
