@@ -117,7 +117,7 @@ void loop() {
     if (target < apogee){
         extended = 1; //how many millimeters to extend actuator
         int maxExtend = min(pos + 6*mmExtend, 180);
-        for (int i = pos; i <= maxExtend; pos += 6)
+        for (int i = pos; i <= maxExtend; i += 6)
         {
             pos = i;
             myservo.write(pos);
@@ -128,7 +128,7 @@ void loop() {
     } else if (target > apogee){
         extended = -1;
         int maxExtend = max(pos - 6*mmExtend, 0);
-        for (int i = pos; i >= maxExtend; pos -= 6)
+        for (int i = pos; i >= maxExtend; i -= 6)
         {
             pos = i;
             myservo.write(pos);
