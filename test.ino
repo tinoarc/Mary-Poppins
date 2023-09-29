@@ -150,10 +150,11 @@ void loop() {
           myservo.write(pos);
       }
       
-      prevAlt = altitude; //seting previous altitude to current altitude
       // Serial.print("Control Output: ");
       // Serial.println(output);
     }
+    
+    prevAlt = altitude; //seting previous altitude to current altitude
     // Rest of your loop code...
     //writing data to sd card
 
