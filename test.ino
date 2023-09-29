@@ -2,12 +2,20 @@
 #include <Wire.h>
 #include <SD.h>
 #include <DFRobot_BMP3XX.h>
-#include <PID_v1.h>  // Include the PID library
+//#include <PID_v1.h>  // Include the PID library
 #include <Servo.h>
 
 File myFile;
 Servo myservo;
 String nameGlobal;
+
+const int IDLE = 0; // Idle is when not doing anything (before coasting)
+const int RECORD = 1; //Record is when only recording data
+const int ACTIVE = 2; //Active is when airbrake control is used
+int mode = IDLE;
+const double activeThresh = 100; //altitude in meters, when rocket goes from idel to active
+const int recordDelay = 50; //how quickly the arduino asks for data from sensors (in ms)
+const int idleDelay = 100;
 
 const int xPin = A2;
 const int yPin = A1;
@@ -102,89 +110,99 @@ void loop() {
 
     // Calculate the PID output
     //myPID.Compute();
-
-    double apogee = -1; //placeholder 
-    double target = 250; //in meters
-    double v = calculateVel(altitude, prevAlt); //need to calculate velocity
-    double k = calculateK(v, xCalc/10); //axis may be up for change depend on mount orientation
-    apogee = predictApogee(mass, k, v) + altitude;
-    // Adjust the airbrakes position based on the PID output
-    // Replace this with your code to control the airbrakes
-    // For example, you can map the output to the position of the airbrakes servo/motor
-
-    //6s for extension, 30 degrees per second, 1/5 second for 6 degree extension/retraction
-    
-    if (target < apogee){
-        extended = 1; //how many millimeters to extend actuator
-        int maxExtend = min(pos + 6*mmExtend, 180);
-        for (int i = pos; i <= maxExtend; i += 6)
-        {
-            pos = i;
-            myservo.write(pos);
-            delay(200);
-        }
-        pos = maxExtend;
-        myservo.write(pos);
-    } else if (target > apogee){
-        extended = -1;
-        int maxExtend = max(pos - 6*mmExtend, 0);
-        for (int i = pos; i >= maxExtend; i -= 6)
-        {
-            pos = i;
-            myservo.write(pos);
-            delay(200);
-        }
-        pos = maxExtend;
-        myservo.write(pos);
+    if (mode == IDLE && altitude > activeThresh){ //change mode to active when past the altitude threshold (coasting phase)
+      mode == ACTIVE;
     }
+    
+    double apogee = -1; //placeholder 
+    if (mode == ACTIVE){ //check if mode is active
+      double target = 250; //in meters
+      double v = calculateVel(altitude, prevAlt); //need to calculate velocity
+      double k = calculateK(v, xCalc/10); //axis may be up for change depend on mount orientation
+      apogee = predictApogee(mass, k, v) + altitude;
+      // Adjust the airbrakes position based on the PID output
+      // Replace this with your code to control the airbrakes
+      // For example, you can map the output to the position of the airbrakes servo/motor
 
-    // Serial.print("Control Output: ");
-    // Serial.println(output);
-
+      //6s for extension, 30 degrees per second, 1/5 second for 6 degree extension/retraction
+      
+      if (target < apogee){
+          extended = 1; //how many millimeters to extend actuator
+          int maxExtend = min(pos + 6*mmExtend, 180);
+          for (int i = pos; i <= maxExtend; i += 6)
+          {
+              pos = i;
+              myservo.write(pos);
+              delay(200);
+          }
+          pos = maxExtend;
+          myservo.write(pos);
+      } else if (target > apogee){
+          extended = -1;
+          int maxExtend = max(pos - 6*mmExtend, 0);
+          for (int i = pos; i >= maxExtend; i -= 6)
+          {
+              pos = i;
+              myservo.write(pos);
+              delay(200);
+          }
+          pos = maxExtend;
+          myservo.write(pos);
+      }
+      
+      prevAlt = altitude; //seting previous altitude to current altitude
+      // Serial.print("Control Output: ");
+      // Serial.println(output);
+    }
     // Rest of your loop code...
     //writing data to sd card
 
     //reformat logging stuffs
-    myFile = SD.open(nameGlobal, FILE_WRITE);
-    if (myFile){
-        Serial.print(nameGlobal);
-        Serial.print("\t");
-        // write necessary data to SD Card here
-        myFile.print("Accelerometer Data: "); 
-        myFile.print(xCalc/10);
-        myFile.print(",\t");
+    if (mode != IDLE){
+      myFile = SD.open(nameGlobal, FILE_WRITE);
+      if (myFile){
+          Serial.print(nameGlobal);
+          Serial.print("\t");
+          // write necessary data to SD Card here
+          myFile.print("Accelerometer Data: "); 
+          myFile.print(xCalc/10);
+          myFile.print(",\t");
 
-        myFile.print(yCalc/10);
-        myFile.print(",\t");
+          myFile.print(yCalc/10);
+          myFile.print(",\t");
 
-        myFile.print(zCalc/10);
-        myFile.print("\t");
+          myFile.print(zCalc/10);
+          myFile.print("\t");
 
-        myFile.print("Barometer Data: "); 
-        myFile.print(altitude);
-        myFile.print("m"); //might need to be changed
-        myFile.print("\t");
+          myFile.print("Barometer Data: "); 
+          myFile.print(altitude);
+          myFile.print("m"); //might need to be changed
+          myFile.print("\t");
+          if (mode == ACTIVE){}
+            myFile.print("Predicted apogee: ");
+            myFile.print(apogee);
+            myFile.print("m");
+            myFile.print("\t");
+            Serial.println(apogee);
+          if (extended != 0){
+              myFile.print("Extended Actuator: ");
+              myFile.print((mmExtend*extended));
+              myFile.print("mm");
+          }
+          myFile.println("");
+          myFile.close();
 
-        myFile.print("Predicted apogee: ");
-        myFile.print(apogee);
-        myFile.print("m");
-        myFile.print("\t");
-        Serial.println(apogee);
-        if (extended != 0){
-            myFile.print("Extended Actuator: ");
-            myFile.print((mmExtend*extended));
-            myFile.print("mm");
-        }
-        myFile.println("");
-        myFile.close();
-
-        Serial.println("done.");
-    } else {
-        Serial.println("error opening test.txt");
+          Serial.println("done.");
+      } else {
+          Serial.println("error opening test.txt");
+      }
     }
-    prevAlt = altitude; //seting previous altitude to current altitude
-    if (extended == 0)
-        delay(200 * mmExtend); //artificial delay to keep delta T constant
+    if (extended == 0 && mode == ACTIVE)
+      delay(200 * mmExtend); //artificial delay to keep delta T constant
+    if (mode == RECORD)
+      delay(recordDelay);
+    if (mode == IDLE)
+      delay(idleDelay);
 }
 
 double calculateVel(double altitude, double prevAltitude){
