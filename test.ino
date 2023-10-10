@@ -12,7 +12,7 @@ String nameGlobal;
 const int IDLE = 0; // Idle is when not doing anything (before coasting)
 const int RECORD = 1; //Record is when only recording data
 const int ACTIVE = 2; //Active is when airbrake control is used
-int mode = IDLE;
+int mode = ACTIVE;
 const double activeThresh = 100; //altitude in meters, when rocket goes from idel to active
 const int recordDelay = 50; //how quickly the arduino asks for data from sensors (in ms)
 const int idleDelay = 100;
@@ -40,6 +40,7 @@ double startAlt = 310.0; //in feet, of height of motor burnout
 // Define PID variables
 double altitude; //current altitude being read by barometer
 double prevAlt = -1; //altitude detected in previous loop, used to get instantaneous velocity
+double v = 0;
 const int mmExtend = 1; //how many millimeters to extend actuator per loop
 int pos = 0;
 int extended = 0; //is 0 if no extension, 1 if extended outwards, -1 if extended inwards
@@ -107,6 +108,7 @@ void loop() {
 
     // Read altitude from the sensor
     altitude = sensor.readAltitudeM(); //need to check if its reading out meters or feet/inches
+    //altitude should be zeroed to ~71.8
 
     // Calculate the PID output
     //myPID.Compute();
@@ -117,12 +119,17 @@ void loop() {
     double apogee = -1; //placeholder 
     if (mode == ACTIVE){ //check if mode is active
       double target = 250; //in meters
-      double v = calculateVel(altitude, prevAlt); //need to calculate velocity
-      double k = calculateK(v, xCalc/10); //axis may be up for change depend on mount orientation
+      v = calculateVel(altitude, prevAlt); //need to calculate velocity
+      // if (v < 1 || v > 10000)
+      //   v = 1;
+      // if (xCalc/10 < 1 || xCalc/10 > 10000)
+      //   xCalc = 10;
+      double k = calculateK(v, -xCalc/10); //axis may be up for change depend on mount orientation
+      //x calc may need to be multiplied by -1 depending on orientation
+      //accel may be in G or m/s^2
       apogee = predictApogee(mass, k, v) + altitude;
+      
       // Adjust the airbrakes position based on the PID output
-      // Replace this with your code to control the airbrakes
-      // For example, you can map the output to the position of the airbrakes servo/motor
 
       //6s for extension, 30 degrees per second, 1/5 second for 6 degree extension/retraction
       
@@ -179,16 +186,28 @@ void loop() {
           myFile.print(altitude);
           myFile.print("m"); //might need to be changed
           myFile.print("\t");
-          if (mode == ACTIVE){}
+          if (mode == ACTIVE){
             myFile.print("Predicted apogee: ");
             myFile.print(apogee);
             myFile.print("m");
             myFile.print("\t");
+            Serial.println();
+            Serial.print("Predicted apogee: ");
             Serial.println(apogee);
+            myFile.print("Velocity Data: "); 
+            myFile.print(v);
+            myFile.print("m/s"); //might need to be changed
+            myFile.print("\t");
+            Serial.print("Velocity: ");
+            Serial.println(v);
+          }
           if (extended != 0){
-              myFile.print("Extended Actuator: ");
-              myFile.print((mmExtend*extended));
-              myFile.print("mm");
+            Serial.println();
+            Serial.print("Extending: ");
+            Serial.println(extended);
+            myFile.print("Extended Actuator: ");
+            myFile.print((mmExtend*extended));
+            myFile.print("mm");
           }
           myFile.println("");
           myFile.close();
@@ -240,5 +259,14 @@ double calculateSA(){
 
 double predictApogee(double M, double k, double v){
     double yc = (M / (2*k))*log((M*g + k*v*v) / (M*g));
+    Serial.println();
+    Serial.print("thingy: ");
+    Serial.println(log(2.718));
+    Serial.print("thingy2: ");
+    Serial.println((M / (2*k)));
+    Serial.print("thingy3: ");
+    Serial.println(log((M*g + k*v*v) / (M*g)));
+    Serial.print("thingy4: ");
+    Serial.println((M*g + k*v*v) / (M*g));
     return yc;
 }
