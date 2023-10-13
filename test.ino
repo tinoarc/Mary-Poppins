@@ -90,7 +90,7 @@ void setup() {
 
     delay(100);
     #ifdef CALIBRATE_ABSOLUTE_DIFFERENCE
-    if( sensor.calibratedAbsoluteDifference(72.0) ){
+    if( sensor.calibratedAbsoluteDifference(0) ){
         Serial.println("Absolute difference base value set successfully!");
     }
     #endif
