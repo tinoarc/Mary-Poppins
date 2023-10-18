@@ -113,9 +113,17 @@ void loop() {
     updatePos();
   }
   writeData();
-  delay(100);
   prevAltitude = altitude;
   prevTime = time;
+  addDelay();
+}
+void addDelay(){
+  if (extended == 0 && mode == ACTIVE)
+    delay(200 * mmExtend); //artificial delay to keep delta T constant
+  if (mode == RECORD)
+    delay(recordDelay);
+  if (mode == IDLE)
+    delay(idleDelay);
 }
 void updateAcceleration() {
   int xRaw = 0, yRaw = 0, zRaw = 0;
@@ -139,15 +147,27 @@ void updateVelocity(){
 
 void updatePos() {
   if (target < apogee){
-    if (pos <= 180) {
+    extended = 1; //how many millimeters to extend actuator
+    int maxExtend = min(pos + 6*mmExtend, 180);
+    for (int i = pos; i <= maxExtend; i += 6)
+    {
+      pos = i;
       myservo.write(pos);
-      pos++;
+      delay(200);
     }
+    pos = maxExtend;
+    myservo.write(pos);
   } else if (target > apogee){
-    if (pos >= 0) {
+    extended = -1;
+    int maxExtend = max(pos - 6*mmExtend, 0);
+    for (int i = pos; i >= maxExtend; i -= 6)
+    {
+      pos = i;
       myservo.write(pos);
-      pos--;
+      delay(200);
     }
+    pos = maxExtend;
+    myservo.write(pos);
   }
 }
 
@@ -165,34 +185,55 @@ void updateApogee() {
 }
 
 void writeData() {
-  myFile = SD.open(nameGlobal, FILE_WRITE);
-  if (myFile){
-    myFile.print(nameGlobal);
-    myFile.print("\t");
+  if (mode != IDLE){
+    myFile = SD.open(nameGlobal, FILE_WRITE);
+    if (myFile){
+      Serial.print(nameGlobal);
+      Serial.print("\t");
+      // write necessary data to SD Card here
+      myFile.print("Accelerometer Data: "); 
+      myFile.print(xCalc/10);
+      myFile.print(",\t");
 
-    myFile.print("Accelerometer Data"); 
-    myFile.print("\t");
+      myFile.print(yCalc/10);
+      myFile.print(",\t");
 
-    myFile.print(currX);
-    myFile.print("\t");
+      myFile.print(zCalc/10);
+      myFile.print("\t");
 
-    myFile.print(currY);
-    myFile.print("\t");
+      myFile.print("Barometer Data: "); 
+      myFile.print(altitude);
+      myFile.print("m"); //might need to be changed
+      myFile.print("\t");
+      if (mode == ACTIVE){
+        myFile.print("Predicted apogee: ");
+        myFile.print(apogee);
+        myFile.print("m");
+        myFile.print("\t");
+        Serial.println();
+        Serial.print("Predicted apogee: ");
+        Serial.println(apogee);
+        myFile.print("Velocity Data: "); 
+        myFile.print(v);
+        myFile.print("m/s"); //might need to be changed
+        myFile.print("\t");
+        Serial.print("Velocity: ");
+        Serial.println(v);
+      }
+      if (extended != 0){
+        Serial.println();
+        Serial.print("Extending: ");
+        Serial.println(extended);
+        myFile.print("Extended Actuator: ");
+        myFile.print((mmExtend*extended));
+        myFile.print("mm");
+      }
+      myFile.println("");
+      myFile.close();
 
-    myFile.print(currZ);
-    myFile.print("\t");
-
-    myFile.print(altitude + "m"); 
-    myFile.print("\t");
-
-    myFile.print(velocity + "m/s"); 
-    myFile.print("\t");
-
-    myFile.print(apogee + "m");
-    myFile.print("\t");
-
-    myFile.print(pos + "mm");
-    
-    myFile.close();
+      Serial.println("done.");
+    } else {
+      Serial.println("error opening test.txt");
+    }
   }
 }
