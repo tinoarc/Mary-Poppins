@@ -5,7 +5,7 @@
 #include <Servo.h>
 
 File myFile;
-String nameGlobal
+String nameGlobal;
 
 Servo myservo;
 int pos = 0;
@@ -21,23 +21,24 @@ const int idleDelay = 100;
 const int xPin = A2;
 const int yPin = A1;
 const int zPin = A0;
-int initialX = 0; //might have to change these integers to doubles
-int initialY = 0;
-int initialZ = 0;
-int currX = 0;
-int currY = 0;
-int currZ = 0;
+double initialX = 0; //might have to change these integers to doubles
+double initialY = 0;
+double initialZ = 0;
+double currX = 0;
+double currY = 0;
+double currZ = 0;
 const int samples = 10;
 
 DFRobot_BMP390L_I2C sensor(&Wire, sensor.eSDOVDD);
 #define CALIBRATE_ABSOLUTE_DIFFERENCE
 
 double altitude = 0; 
-double prevAlttiude = 0;
+double prevAltitude = 0;
 double time = 0;
 double prevTime = 0;
 double velocity = 0;
 const int mmExtend = 1; //how many millimeters to extend actuator per loop
+int extended = 0;
 
 const double g = 9.81; //gravity
 const double rho = 1.16; //1.2 kg/m^3 is placeholder rn
@@ -192,13 +193,13 @@ void writeData() {
       Serial.print("\t");
       // write necessary data to SD Card here
       myFile.print("Accelerometer Data: "); 
-      myFile.print(xCalc/10);
+      myFile.print(currX);
       myFile.print(",\t");
 
-      myFile.print(yCalc/10);
+      myFile.print(currY);
       myFile.print(",\t");
 
-      myFile.print(zCalc/10);
+      myFile.print(currZ);
       myFile.print("\t");
 
       myFile.print("Barometer Data: "); 
@@ -214,11 +215,11 @@ void writeData() {
         Serial.print("Predicted apogee: ");
         Serial.println(apogee);
         myFile.print("Velocity Data: "); 
-        myFile.print(v);
+        myFile.print(velocity);
         myFile.print("m/s"); //might need to be changed
         myFile.print("\t");
         Serial.print("Velocity: ");
-        Serial.println(v);
+        Serial.println(velocity);
       }
       if (extended != 0){
         Serial.println();
