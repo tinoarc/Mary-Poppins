@@ -27,7 +27,9 @@ double initialZ = 0;
 double currX = 0;
 double currY = 0;
 double currZ = 0;
+double xRaw = 0.0, yRaw = 0.0, zRaw = 0.0;
 const int samples = 10;
+double barometricAcceleration = 0.0;
 
 DFRobot_BMP390L_I2C sensor(&Wire, sensor.eSDOVDD);
 #define CALIBRATE_ABSOLUTE_DIFFERENCE
@@ -37,6 +39,8 @@ double prevAltitude = 0;
 double time = 0;
 double prevTime = 0;
 double velocity = 0;
+double prevVelocity = 0.0;
+
 const int mmExtend = 1; //how many millimeters to extend actuator per loop
 int extended = 0;
 
@@ -46,6 +50,8 @@ const double baseSA = 0.004046; //base surface area without extension
 const double mass = 0.512; //in kg
 const double target = 250; 
 double apogee;
+
+int begin = 5; //begin - 1 is the number of beginning values ignored
 
 void setup() {
   Serial.begin(460800); //might need to change this
@@ -107,14 +113,15 @@ void loop() {
   }
     
   time = millis();
+  updateVelocity();
   updateAcceleration();
   if (mode == ACTIVE){
-    updateVelocity();
     updateApogee();
     updatePos();
   }
   writeData();
   prevAltitude = altitude;
+  prevVelocity = velocity;
   prevTime = time;
   addDelay();
 }
@@ -127,19 +134,41 @@ void addDelay(){
     delay(idleDelay);
 }
 void updateAcceleration() {
-  int xRaw = 0, yRaw = 0, zRaw = 0;
-  for(int i=0;i<samples;i++)
-  {
-    xRaw+=analogRead(xPin);
-    yRaw+=analogRead(yPin);
-    zRaw+=analogRead(zPin);
+  barometricAcceleration = (velocity - prevVelocity)/(time - prevTime);
+  if (begin==0) {
+    xRaw = 0.0; 
+    yRaw = 0.0; 
+    zRaw = 0.0;
+    for(int i=0;i<samples;i++)
+    {
+      xRaw+=analogRead(xPin);
+      yRaw+=analogRead(yPin);
+      zRaw+=analogRead(zPin);
+    }
+    xRaw/=samples;
+    yRaw/=samples;
+    zRaw/=samples;
+    
+    currX = map(xRaw, initialX - 14.0, initialX + 14.0, -981.0, 981.0)/100.0;
+    currY = map(yRaw, initialY - 14.0, initialY + 14.0, -981.0, 981.0)/100.0;
+    currZ = map(zRaw, initialZ - 28.0, initialZ, -981.0, 981.0)/100.0;
+    //currZ = -18;
+  } else { //might need to be changed for efficiency
+    initialX=0.0;
+    initialY=0.0;
+    initialZ=0.0;
+    for(int i=0;i<samples;i++)
+    {
+      initialX+=analogRead(xPin);
+      initialY+=analogRead(yPin);
+      initialZ+=analogRead(zPin);
+    }
+    initialX/=samples;
+    initialY/=samples;
+    initialZ/=samples;
+
+    begin--;
   }
-  xRaw/=samples;
-  yRaw/=samples;
-  zRaw/=samples;
-  currX = map(xRaw, initialX - 14, initialX + 14, -981, 981)/100.0;
-  currY = map(yRaw, initialY - 14, initialY + 14, -981, 981)/100.0;
-  currZ = 0;
 }
 
 void updateVelocity(){
@@ -190,46 +219,91 @@ void writeData() {
     myFile = SD.open(nameGlobal, FILE_WRITE);
     if (myFile){
       Serial.print(nameGlobal);
-      Serial.print("\t");
+      Serial.print("\n");
       // write necessary data to SD Card here
-      myFile.print("Accelerometer Data: "); 
+      myFile.print("Accelerometer Data"); 
+      myFile.print("\n");
+
+      myFile.print("Raw Accelerometer 0G Acceleration (x, y, z)");
+      myFile.print("\t");
+
+      myFile.print(initialX);
+      myFile.print("\t");
+
+      myFile.print(initialY);
+      myFile.print("\t");
+
+      myFile.print(initialZ);
+      myFile.print("\n");
+
+      myFile.print("Raw Accelerometer Acceleration (x, y, z)");
+      myFile.print("\t");
+
+      myFile.print(xRaw);
+      myFile.print("\t");
+
+      myFile.print(yRaw);
+      myFile.print("\t");
+
+      myFile.print(zRaw);
+      myFile.print("\n"); 
+
+      myFile.print("Calculated Acceleration (m/s)^2 (x, y, z)");
+      myFile.print("\t");
+
       myFile.print(currX);
-      myFile.print(",\t");
+      myFile.print("\t");
 
       myFile.print(currY);
-      myFile.print(",\t");
+      myFile.print("\t");
 
       myFile.print(currZ);
-      myFile.print("\t");
+      myFile.print("\n");
 
-      myFile.print("Barometer Data: "); 
-      myFile.print(altitude);
-      myFile.print("m"); //might need to be changed
+      myFile.print("Barometer Data");
+      myFile.print("\n");
+
+      myFile.print("Barometric Altitude (m)");
       myFile.print("\t");
+      myFile.print(altitude); 
+      myFile.print("\n");
+
+      myFile.print("Barometric Velocity (m/s)");
+      myFile.print("\t");
+      myFile.print(velocity); 
+      myFile.print("\n");
+
+      myFile.print("Barometric Acceleration (m/s)^2");
+      myFile.print("\t");
+      myFile.print(barometricAcceleration);
+      myFile.print("\n");
+
       if (mode == ACTIVE){
-        myFile.print("Predicted apogee: ");
-        myFile.print(apogee);
-        myFile.print("m");
-        myFile.print("\t");
         Serial.println();
         Serial.print("Predicted apogee: ");
         Serial.println(apogee);
-        myFile.print("Velocity Data: "); 
-        myFile.print(velocity);
-        myFile.print("m/s"); //might need to be changed
-        myFile.print("\t");
+
         Serial.print("Velocity: ");
         Serial.println(velocity);
+
+        myFile.print("Estimated Apogee (m)");
+        myFile.print("\t");
+        myFile.println(apogee);
+
+        myFile.print("Actuator Extension (degrees)");
+        myFile.print("\t");
+        myFile.println(pos);
       }
       if (extended != 0){
         Serial.println();
         Serial.print("Extending: ");
         Serial.println(extended);
-        myFile.print("Extended Actuator: ");
-        myFile.print((mmExtend*extended));
-        myFile.print("mm");
+        
+        myFile.print("Extended Actuator (mm)");
+        myFile.print("\t");
+        myFile.println((mmExtend*extended));
       }
-      myFile.println("");
+      myFile.println(""); 
       myFile.close();
 
       Serial.println("done.");
