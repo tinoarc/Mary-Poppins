@@ -36,8 +36,8 @@ DFRobot_BMP390L_I2C sensor(&Wire, sensor.eSDOVDD);
 
 double altitude = 0; 
 double prevAltitude = 0;
-double time = 0;
-double prevTime = 0;
+unsigned long time = 0; //is in milliseconds
+unsigned long prevTime = 0;
 double velocity = 0;
 double prevVelocity = 0.0;
 
@@ -134,7 +134,8 @@ void addDelay(){
     delay(idleDelay);
 }
 void updateAcceleration() {
-  barometricAcceleration = (velocity - prevVelocity)/(time - prevTime);
+  double timeElapsed = (time - prevTime)/1000;
+  barometricAcceleration = (velocity - prevVelocity)/(timeElapsed);
   if (begin==0) {
     xRaw = 0.0; 
     yRaw = 0.0; 
@@ -172,7 +173,8 @@ void updateAcceleration() {
 }
 
 void updateVelocity(){
-  velocity = (altitude - prevAltitude)/(time - prevTime);
+  double timeElapsed = (time - prevTime)/1000;
+  velocity = (altitude - prevAltitude)/(timeElapsed);
 }
 
 void updatePos() {
@@ -221,6 +223,14 @@ void writeData() {
       Serial.print(nameGlobal);
       Serial.print("\n");
       // write necessary data to SD Card here
+      myFile.print("Time (milliseconds)");
+      myFile.print("\t");
+      myFile.print(time); 
+      myFile.print("\t");
+      double timeInSeconds = time/1000;
+      myFile.print(timeInSeconds); 
+      myFile.print("\n");
+
       myFile.print("Accelerometer Data"); 
       myFile.print("\n");
 
