@@ -134,7 +134,7 @@ void addDelay(){
     delay(idleDelay);
 }
 void updateAcceleration() {
-  double timeElapsed = (time - prevTime)/1000;
+  double timeElapsed = (time - prevTime)/1000.0;
   barometricAcceleration = (velocity - prevVelocity)/(timeElapsed);
   if (begin==0) {
     xRaw = 0.0; 
@@ -227,7 +227,7 @@ void writeData() {
       myFile.print("\t");
       myFile.print(time); 
       myFile.print("\t");
-      double timeInSeconds = time/1000;
+      double timeInSeconds = time/1000.0;
       myFile.print(timeInSeconds); 
       myFile.print("\n");
 
