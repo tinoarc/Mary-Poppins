@@ -91,8 +91,10 @@ void loop() {
   updateVelocity();
   updateAcceleration();
   if (mode == ACTIVE) {
-    updateApogee(currX);
-    //updatePos();
+    if (velocity > 0 && currX < 0){
+      updateApogee(currX);
+      //updatePos();
+    }
   }
   writeData();
   prevAltitude = altitude;
