@@ -104,7 +104,7 @@ void loop() {
 }
 
 void addDelay() {
-  delay(100);
+  delay(70);
 
   /*
   if (extended == 0 && mode == ACTIVE)
