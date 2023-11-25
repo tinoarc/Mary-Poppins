@@ -14,9 +14,9 @@ int pos = 0;
 const int IDLE = 0; // Idle is when not doing anything (before coasting)
 const int RECORD = 1; //Record is when only recording data
 const int ACTIVE = 2; //Active is when airbrake control is used
-//int mode = IDLE;
-int mode = ACTIVE;
-const double activeThresh = 100; //altitude in meters, when rocket goes from idel to active
+int mode = IDLE;
+//int mode = ACTIVE;
+//const double activeThresh = 100; //altitude in meters, when rocket goes from idel to active
 const int xPin = A2;
 const int yPin = A1;
 const int zPin = A0;
@@ -82,38 +82,47 @@ void setup() {
 void loop() {
   extended = 0;
   time = millis()/1000.0;
-  altitude = sensor.readAltitudeM();
-  /*
-  if (mode == IDLE && altitude > activeThresh){ //change mode to active when past the altitude threshold (coasting phase)
-    mode == ACTIVE;
-  }
-  */
-  updateVelocity();
-  updateAcceleration();
-  if (mode == ACTIVE) {
-    if (velocity > 0 && currX < 0){
-      updateApogee(currX);
-      //updatePos();
+  Serial.println(time - prevTime);
+  if ((time - prevTime) >= findDelay()){
+    altitude = sensor.readAltitudeM();
+    
+    if (mode == IDLE && isCoasting()){ //change mode to active when past the altitude threshold (coasting phase)
+      mode = ACTIVE;
     }
+    if (mode == ACTIVE && isPastApogee()){
+      mode = IDLE;
+      retractFully();
+    }
+    
+    updateVelocity();
+    updateAcceleration();
+    if (mode == ACTIVE) {
+      if (velocity > 0 && currX < 0){
+        updateApogee(currX);
+        updatePos();
+      }
+    }
+    writeData();
+    prevAltitude = altitude;
+    prevVelocity = velocity;
+    prevTime = time;
+    //addDelay();
   }
-  writeData();
-  prevAltitude = altitude;
-  prevVelocity = velocity;
-  prevTime = time;
-  addDelay();
+  //delay(50);
 }
 
-void addDelay() {
-  delay(70);
+double findDelay() {
+  if (mode == ACTIVE && extended != 0)
+    return 0.250;
+  return 0.100;
+}
 
-  /*
-  if (extended == 0 && mode == ACTIVE)
-    delay(100 * mmExtend); //artificial delay to keep delta T constant
-  if (mode == RECORD)
-    delay(recordDelay);
-  if (mode == IDLE)
-    delay(idleDelay);
-  */
+bool isCoasting(){
+  return currX < 0 && altitude > 50 && velocity > 0;
+}
+
+bool isPastApogee(){ //retract airbreak
+  return velocity < 0;
 }
 
 void updateAcceleration() {
@@ -158,6 +167,19 @@ void updateVelocity(){
   velocity = (altitude - prevAltitude)/(time - prevTime);
 }
 
+void retractFully(){
+  extended = -1;
+  int maxExtend = 0;
+  for (int i = pos; i >= maxExtend; i -= 6)
+  {
+    pos = i;
+    myservo.write(pos);
+    delay(200);
+  }
+  pos = maxExtend;
+  myservo.write(pos);
+}
+
 void updatePos() {
   if (target < apogee){
     extended = 1; //how many millimeters to extend actuator
@@ -198,80 +220,78 @@ void updateApogee(double accel) {
 }
 
 void writeData() {
-  if (mode != IDLE){
-    myFile = SD.open(nameGlobal, FILE_WRITE);
-    if (myFile){
-      Serial.print(nameGlobal);
-      Serial.print("\n");
-      // write necessary data to SD Card here
-      myFile.print("Time (seconds)");
-      myFile.print("\t");
-      myFile.println(time); 
+  myFile = SD.open(nameGlobal, FILE_WRITE);
+  if (myFile){
+    Serial.print(nameGlobal);
+    Serial.print("\n");
+    // write necessary data to SD Card here
+    myFile.print("Time (seconds)");
+    myFile.print("\t");
+    myFile.println(time); 
 
-      myFile.print("Accelerometer Data"); 
-      myFile.print("\n");
-      myFile.print("Raw Accelerometer 0G Acceleration (x, y, z)");
-      myFile.print("\t");
-      myFile.print(initialX);
-      myFile.print("\t");
-      myFile.print(initialY);
-      myFile.print("\t");
-      myFile.println(initialZ);
+    myFile.print("Accelerometer Data"); 
+    myFile.print("\n");
+    myFile.print("Raw Accelerometer 0G Acceleration (x, y, z)");
+    myFile.print("\t");
+    myFile.print(initialX);
+    myFile.print("\t");
+    myFile.print(initialY);
+    myFile.print("\t");
+    myFile.println(initialZ);
 
-      myFile.print("Raw Accelerometer Acceleration (x, y, z)");
-      myFile.print("\t");
-      myFile.print(xRaw);
-      myFile.print("\t");
-      myFile.print(yRaw);
-      myFile.print("\t");
-      myFile.println(zRaw);
+    myFile.print("Raw Accelerometer Acceleration (x, y, z)");
+    myFile.print("\t");
+    myFile.print(xRaw);
+    myFile.print("\t");
+    myFile.print(yRaw);
+    myFile.print("\t");
+    myFile.println(zRaw);
 
-      myFile.print("Calculated Acceleration (m/s)^2 (x, y, z)");
-      myFile.print("\t");
-      myFile.print(currX);
-      myFile.print("\t");
-      myFile.print(currY);
-      myFile.print("\t");
-      myFile.println(currZ);
+    myFile.print("Calculated Acceleration (m/s)^2 (x, y, z)");
+    myFile.print("\t");
+    myFile.print(currX);
+    myFile.print("\t");
+    myFile.print(currY);
+    myFile.print("\t");
+    myFile.println(currZ);
 
-      myFile.println("Barometer Data");
-      myFile.print("Barometric Altitude (m)");
-      myFile.print("\t");
-      myFile.println(altitude); 
-      myFile.print("Barometric Velocity (m/s)");
-      myFile.print("\t");
-      myFile.println(velocity); 
-      myFile.print("Barometric Acceleration (m/s)^2");
-      myFile.print("\t");
-      myFile.println(barometricAcceleration);
+    myFile.println("Barometer Data");
+    myFile.print("Barometric Altitude (m)");
+    myFile.print("\t");
+    myFile.println(altitude); 
+    myFile.print("Barometric Velocity (m/s)");
+    myFile.print("\t");
+    myFile.println(velocity); 
+    myFile.print("Barometric Acceleration (m/s)^2");
+    myFile.print("\t");
+    myFile.println(barometricAcceleration);
 
-      if (mode == ACTIVE){
-        Serial.println();
-        Serial.print("Predicted apogee: ");
-        Serial.println(apogee);
-        Serial.print("Velocity: ");
-        Serial.println(velocity);
-        myFile.print("Estimated Apogee (m)");
-        myFile.print("\t");
-        myFile.println(apogee);
-        myFile.print("Actuator Extension (degrees)");
-        myFile.print("\t");
-        myFile.println(pos);
-      }
-      if (extended != 0){
-        Serial.println();
-        Serial.print("Extending: ");
-        Serial.println(extended);
-        
-        myFile.print("Extended Actuator (mm)");
-        myFile.print("\t");
-        myFile.println((mmExtend*extended));
-      }
-      myFile.println(""); 
-      myFile.close();
-      Serial.println("done.");
-    } else {
-      Serial.println("error opening test.txt");
+    if (mode == ACTIVE){
+      Serial.println();
+      Serial.print("Predicted apogee: ");
+      Serial.println(apogee);
+      Serial.print("Velocity: ");
+      Serial.println(velocity);
+      myFile.print("Estimated Apogee (m)");
+      myFile.print("\t");
+      myFile.println(apogee);
+      myFile.print("Actuator Extension (degrees)");
+      myFile.print("\t");
+      myFile.println(pos);
     }
+    // if (extended != 0){
+    //   Serial.println();
+    //   Serial.print("Extending: ");
+    //   Serial.println(extended);
+      
+    //   myFile.print("Extended Actuator (mm)");
+    //   myFile.print("\t");
+    //   myFile.println((mmExtend*extended));
+    // }
+    myFile.println(""); 
+    myFile.close();
+    //Serial.println("done.");
+  } else {
+    Serial.println("error opening test.txt");
   }
 }
