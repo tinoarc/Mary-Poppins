@@ -208,6 +208,7 @@ void updatePos() {
 
 void updateApogee(double accel) {
   double Cd = 0.0;
+  double Cd2 = 0.0;
 	
   double num = -2.0 * (accel * mass + mass*9.81);
   double den = 1.0 * velocity * velocity;
@@ -215,7 +216,14 @@ void updateApogee(double accel) {
   Cd = 1.0 * num/den;
   
   double deltaApogee = 0.0 + ((mass / (Cd))*log((mass*9.81 + 0.5*Cd*velocity*velocity) / (mass*9.81)));
+
+  double num2 = -2.0 * (accel * mass);
+  double den2 = 1.0 * velocity * velocity;
   
+  Cd2 = 1.0 * num2/den2;
+  
+  double deltaApogee2 = 0.0 + ((mass / (Cd))*log((mass*9.81 + 0.5*Cd*velocity*velocity) / (mass*9.81)));
+  apogee2 = 0.0 + deltaApogee2 + altitude
   apogee = 0.0 + deltaApogee + altitude; 
 }
 
@@ -275,6 +283,9 @@ void writeData() {
       myFile.print("Estimated Apogee (m)");
       myFile.print("\t");
       myFile.println(apogee);
+      myFile.print("Estimated Apogee two (m)");
+      myFile.print("\t");
+      myFile.println(apogee2);
       myFile.print("Actuator Extension (degrees)");
       myFile.print("\t");
       myFile.println(pos);
