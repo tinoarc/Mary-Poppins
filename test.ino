@@ -40,6 +40,7 @@ double time = 0.0;
 double prevTime = 0.0;
 double velocity = 0.0;
 double prevVelocity = 0.0;
+double prevAcceleration = 0.0;
 
 const int mmExtend = 1; //how many millimeters to extend actuator per loop
 int extended = 0;
@@ -48,6 +49,9 @@ const double g = 9.81;
 const double mass = 0.5652; 
 const double target = 250; 
 double apogee = 0.0;
+double apogee2 = 0.0;
+bool prevIsCoasting = false;
+bool prevIsPastApogee = false;
 
 int begin = 5;
 
@@ -85,6 +89,8 @@ void loop() {
   Serial.println(time - prevTime);
   if ((time - prevTime) >= findDelay()){
     altitude = sensor.readAltitudeM();
+    updateVelocity();
+    updateAcceleration();
     
     if (mode == IDLE && isCoasting()){ //change mode to active when past the altitude threshold (coasting phase)
       mode = ACTIVE;
@@ -94,8 +100,6 @@ void loop() {
       retractFully();
     }
     
-    updateVelocity();
-    updateAcceleration();
     if (mode == ACTIVE) {
       if (velocity > 0 && currX < 0){
         updateApogee(currX);
@@ -106,6 +110,9 @@ void loop() {
     prevAltitude = altitude;
     prevVelocity = velocity;
     prevTime = time;
+    prevAcceleration = currX;
+    prevIsCoasting = isCoasting();
+    prevIsPastApogee = isPastApogee();
     //addDelay();
   }
   //delay(50);
@@ -122,7 +129,7 @@ bool isCoasting(){
 }
 
 bool isPastApogee(){ //retract airbreak
-  return velocity < 0;
+  return velocity < 0 && altitude > 150;
 }
 
 void updateAcceleration() {
@@ -223,7 +230,7 @@ void updateApogee(double accel) {
   Cd2 = 1.0 * num2/den2;
   
   double deltaApogee2 = 0.0 + ((mass / (Cd))*log((mass*9.81 + 0.5*Cd*velocity*velocity) / (mass*9.81)));
-  apogee2 = 0.0 + deltaApogee2 + altitude
+  apogee2 = 0.0 + deltaApogee2 + altitude;
   apogee = 0.0 + deltaApogee + altitude; 
 }
 
@@ -232,7 +239,17 @@ void writeData() {
   if (myFile){
     Serial.print(nameGlobal);
     Serial.print("\n");
+
     // write necessary data to SD Card here
+    if (prevAcceleration < 5.0 && currX > 5.0){
+      myFile.println("####### LAUNCH DETECTED #######");
+    }
+    if (!prevIsCoasting && isCoasting()){
+      myFile.println("####### MOTOR BURNOUT #######");
+    }
+    if (!prevIsPastApogee && isPastApogee()){
+      myFile.println("####### APOGEE ACHIEVED #######");
+    }
     myFile.print("Time (seconds)");
     myFile.print("\t");
     myFile.println(time); 
